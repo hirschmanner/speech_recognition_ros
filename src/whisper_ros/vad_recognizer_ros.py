@@ -47,7 +47,7 @@ class SpeechPublisher:
         a ROS message. It will also publish on the topic "ralli_speech_recognition/is_recording" if it is currently
         recording so it can be displayed to the user.
     """
-    def __init__(self, framerate=16000, aggressiveness=1, languageString = 'en', maximumDelay = 100, ring_buffer_size = 120): #maximumdelay was 50
+    def __init__(self, framerate=16000, aggressiveness=1, languageString = 'en', maximumDelay = 50, ring_buffer_size = 200): #maximumdelay was 50
         self.buffer = Buffer(b'', 0, 0)
         self.framerate = framerate
         self.languageString = languageString
@@ -277,7 +277,7 @@ class SpeechPublisher:
                 # If we're NOTTRIGGERED and more than 70% of the frames in
                 # the ring buffer are voiced frames, then enter the
                 # TRIGGERED state.
-                if np.mean(self.ring_buffer_is_speech) > 0.8:
+                if np.mean(self.ring_buffer_is_speech) > 0.4:
                     # Set startTime to currentTime - ringBufferSize*0.01s. Each of our samples is 10ms
                     self.buffer.startTime.data = rospy.get_rostime() - rospy.Time.from_sec(self.ring_buffer_size*0.01)
                     triggered = True
@@ -370,7 +370,7 @@ def main(args):
 
     # Optionally, set its aggressiveness mode, which is an integer between 0 and 1. 0 is the least aggressive about
     # filtering out non-speech, 3 is the most aggressive.
-    speechRecognition = SpeechPublisher(framerate=16000, aggressiveness=2, languageString='en')
+    speechRecognition = SpeechPublisher(framerate=16000, aggressiveness=2, languageString='de')
     rospy.sleep(2.)
     print('Node Initiated. Ready to Recognize Speech.')
 

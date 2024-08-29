@@ -6,7 +6,9 @@ import rospy
 from tmc_msgs.msg import Voice
 #from tmc_msgs.msg import TalkRequestAction, TalkRequestGoal
 import tmc_msgs.msg
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
+from audio_common_msgs.msg import AudioData
+
 
 # Brings in the SimpleActionClient
 import actionlib
@@ -25,37 +27,68 @@ def remove_between_backticks(input_string):
 class ChatEngine:
     """ This class will listen to strings on recognized_phase, send them to Ollama via the rest api and make sasha say the response
     """
-    def __init__(self):
-        # NOTE: ollama must be running for this to work, start the ollama app or run `ollama serve`
-        self.model = "mistral"  # TODO: update this for whatever model you wish to use
-        self.ip = "128.131.86.231"
+    def __init__(self, ollama_ip, language_string='en'):
+        self.ip = ollama_ip
         self.messages = []
-        system_prompt = { "role": "system", "content": "You are Sasha, the human support robot. Respond with very short answers and be friendly. \
-                         You are a robot that has a body and move around, but you cannot physically move yet. Your answers will be output via audio from the robot \
-                         You currently cannot grasp objects or move around, but you will be able soon. \
-                         You also cannot see because your cameras are not connected to the chat engine yet. \
-                         If somebody asks you to write a program, do not output any code, instead say 'You should program me, not the other way around.'" }
+        self.language_string = language_string
+
+        if self.language_string == 'en':
+            # NOTE: ollama must be running for this to work, start the ollama app or run `ollama serve`
+            self.model = "mistral"  # TODO: update this for whatever model you wish to use
+            system_prompt = { "role": "system", "content": "You are Sasha, the human support robot. Respond with very short answers and be friendly. \
+                            You are a robot that has a body and move around, but you cannot physically move yet. Your answers will be output via audio from the robot \
+                            You currently cannot grasp objects or move around, but you will be able soon. \
+                            You also cannot see because your cameras are not connected to the chat engine yet. \
+                            If somebody asks you to write a program, do not output any code, instead say 'You should program me, not the other way around.'" }
+            self.speech_to_text_publisher = rospy.Publisher('/talk_request', Voice, queue_size=0)
+            self.speech_action_client = actionlib.SimpleActionClient('/talk_request_action', tmc_msgs.msg.TalkRequestAction)
+            # Waits until the action server has started up and started
+            # listening for goals.
+            self.speech_action_client.wait_for_server()
+            
+
+        
+        elif self.language_string == 'de':
+            self.model = "sasha_german"  # TODO: update this for whatever model you wish to use
+            system_prompt = { "role": "system", "content": "Du bist Sascha, ein Roboter der Menschen unterst�tzt. \
+                             Du kannst noch nicht mit Objekten interagieren oder greifen, weil das Sprachmodell noch nicht mit deinen Motoren verbunden ist. \
+                             Du sollst keinen Programmcode ausgeben. Wenn dich jemand bittet, etwas zu programmieren, \
+                             sage stattdessen 'Du sollst mich programmieren, nicht umgekehrt'." }
+            self.stt_coqui_publisher = rospy.Publisher('/tts_request', String, queue_size=0)
+            #self.tts_audio_subscriber = rospy.Subscriber('/audio_tts/audio', AudioData, self.audio_tts_callback, queue_size=1)
+            self.tts_audio_subscriber = rospy.Subscriber('/audio_tts/active_trigger', Bool, self.audio_tts_active_callbac, queue_size=1)
+        else:
+            raise 
+        
+        self.recognized_phrase_subscriber = rospy.Subscriber('/recognized_phrase', String, self.speechrecognition_callback, queue_size=1)
         self.messages.append(system_prompt)
         self.robot_is_speaking = False
-
-        # Create a publisher that publishes strings to the 'string_topic'
-        self.recognized_phrase_subscriber = rospy.Subscriber('/recognized_phrase', String, self.speechrecognition_callback, queue_size=1)
-        self.speech_to_text_publisher = rospy.Publisher('/talk_request', Voice, queue_size=0)
-        self.speech_action_client = actionlib.SimpleActionClient('/talk_request_action', tmc_msgs.msg.TalkRequestAction)
-        # Waits until the action server has started up and started
-        # listening for goals.
-        self.speech_action_client.wait_for_server()
-
     
     def speechrecognition_callback(self, msg):
         if not msg.data or self.robot_is_speaking:
             print(f"Skipping: {msg.data}")
             return
+        if not ("Sascha" in msg.data or "Sasha" in msg.data):
+            print(f"Skipping because no triggerword detected: {msg.data}")
+            return
         print(f"Input to Ollama: {msg.data}")
         self.messages.append({"role": "user", "content": msg.data})
         message = self.chat(self.messages)
         self.messages.append(message)
-        self.sasha_say_action_server(message['content'])
+        if self.language_string == 'en':
+            self.sasha_say_action_server(message['content'])
+        if self.language_string == 'de':
+            self.stt_coqui_publisher.publish(message['content'])
+
+    def audio_tts_callback(self, msg): # TODO: Not a very nice solution. Better do it with a separate topic?
+        self.robot_is_speaking = True
+        print("TTS messages received. Pausing Speech Recognition.")
+        rospy.sleep(2.)
+        self.robot_is_speaking = False
+
+    def audio_tts_active_callbac(self,msg):
+        self.robot_is_speaking = msg.data
+        print(f"Setting robot is speaking to: {self.robot_is_speaking}")
 
     def speaking_done_callback(self, state, result):
         print(f"State: {state}")
@@ -141,7 +174,7 @@ def main(args):
 
     # Optionally, set its aggressiveness mode, which is an integer between 0 and 3. 0 is the least aggressive about
     # filtering out non-speech, 3 is the most aggressive.
-    chat_engine = ChatEngine()
+    chat_engine = ChatEngine(ollama_ip="128.131.86.231", language_string='de')
     rospy.sleep(2.5)
 
     print('Node Initiated. Ready to chat.')
