@@ -1,0 +1,13 @@
+<launch>
+
+    <!-- Define an argument with a default value -->
+    <arg name="language" default="english" />
+
+    <!-- Set the parameter using the argument value -->
+    <param name="language" value="$(arg language)" />
+    
+    <!-- Launch a node with arguments -->
+    <node pkg="whisper_ros" type="speechrecognition_ros.py" name="speechrecognition_ros" output="screen">
+        <param name="language" value="$(arg language)" />
+    </node>
+</launch>

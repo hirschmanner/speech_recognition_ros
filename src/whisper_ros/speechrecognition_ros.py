@@ -22,6 +22,29 @@ import numpy as np
 import whisperx
 import time
 
+language_dict = {
+    "en": "en",  # English
+    "fr": "fr",  # French
+    "de": "de",  # German
+    "es": "es",  # Spanish
+    "it": "it",  # Italian
+    "ja": "ja",  # Japanese
+    "zh": "zh",  # Chinese
+    "nl": "nl",  # Dutch
+    "uk": "uk",  # Ukrainian
+    "pt": "pt",  # Portuguese
+    "german": "de",    # German
+    "english": "en",   # English
+    "french": "fr",    # French
+    "spanish": "es",   # Spanish
+    "italian": "it",   # Italian
+    "japanese": "ja",  # Japanese
+    "chinese": "zh",   # Chinese
+    "dutch": "nl",     # Dutch
+    "ukrainian": "uk", # Ukrainian
+    "portuguese": "pt" # Portuguese
+}
+
 
 class Buffer:
     """ The buffer contains the raw audio as bytes in data. It will also keep the startTime and endTime of the recorded
@@ -47,7 +70,7 @@ class SpeechPublisher:
         a ROS message. It will also publish on the topic "ralli_speech_recognition/is_recording" if it is currently
         recording so it can be displayed to the user.
     """
-    def __init__(self, framerate=16000, aggressiveness=1, languageString = 'en', maximumDelay = 50, ring_buffer_size = 200): #maximumdelay was 50
+    def __init__(self, framerate=16000, aggressiveness=1, languageString = 'en', maximumDelay = 200, ring_buffer_size = 120): #maximumdelay was 50
         self.buffer = Buffer(b'', 0, 0)
         self.framerate = framerate
         self.languageString = languageString
@@ -75,6 +98,9 @@ class SpeechPublisher:
         self.ring_buffer_is_speech = collections.deque(maxlen=ring_buffer_size)
         self.triggered = False
         self.file_counter = 0
+
+        self.start_counter = False
+        self.counter = 0
         # Create a publisher that publishes strings to the 'string_topic'
         self.recognized_phrase_publisher = rospy.Publisher('/recognized_phrase', String, queue_size=10)
         self.subscriber = rospy.Subscriber('/audio/audio', AudioData, self.audio_callback, queue_size=10)
@@ -95,10 +121,18 @@ class SpeechPublisher:
         data = msg.data
         #print(len(data))
 
+
         # Check if the data is dected as speech
         if len(data) >= 320:
             is_speech = self.vad.is_speech(data[:320], self.framerate) #TODO: Fix weird hack to just go to 320 
             #print(is_speech, len(data))
+            # if is_speech and not self.start_counter and len(self.ring_buffer_is_speech) == self.ring_buffer_size:
+            #     self.start_counter = True
+            #     print("Started Counter")
+            # #print(np.mean(self.ring_buffer_is_speech))
+            # if self.start_counter:
+            #     self.counter+=1
+                
         else:
             return
 
@@ -115,6 +149,7 @@ class SpeechPublisher:
                 # Set startTime to currentTime - ringBufferSize*0.01s. Each of our samples is 10ms
                 self.buffer.startTime.data = rospy.get_rostime() - rospy.Time.from_sec(self.ring_buffer_size*0.01)
                 self.triggered = True
+                print("TRIGGERED")
                 # We want to yield all the audio we see from now until
                 # we are NOTTRIGGERED, but we have to start with the
                 # audio that's already in the ring buffer.
@@ -136,6 +171,8 @@ class SpeechPublisher:
                 self.buffer.endTime.data = rospy.get_rostime()
                 self.triggered = False
                 print("Untriggered")
+                start_counter = False
+                print(f"Counter: {self.counter}, Buffersize: {len(self.buffer.data)}")
 
                 try:
                     # recognizedString = self.recognizer.recognize_google(sr.AudioData(self.buffer.data, 16000, 2),
@@ -368,9 +405,16 @@ def write_wave(path, audio, sample_rate):
 def main(args):
     rospy.init_node('ralli_speech_recognition', anonymous=True)
 
+    language = rospy.get_param('~language', 'english')
+    if not language in language_dict:
+        rospy.logerr(f"Invalid language '{language}'! Must be one of {list(language_dict.keys())}")
+        raise ValueError(f"Invalid robot name '{language}'. Allowed values are: {list(language_dict.keys())}")
+
+    rospy.loginfo(f"Chosen Language: {language}")
+
     # Optionally, set its aggressiveness mode, which is an integer between 0 and 1. 0 is the least aggressive about
     # filtering out non-speech, 3 is the most aggressive.
-    speechRecognition = SpeechPublisher(framerate=16000, aggressiveness=2, languageString='de')
+    speechRecognition = SpeechPublisher(framerate=16000, aggressiveness=2, languageString=language_dict[language])
     rospy.sleep(2.)
     print('Node Initiated. Ready to Recognize Speech.')
 

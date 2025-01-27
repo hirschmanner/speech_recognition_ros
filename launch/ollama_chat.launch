@@ -1,0 +1,19 @@
+<launch>
+
+    <!-- Define an argument with a default value -->
+    <arg name="language" default="english" />
+    <arg name="ollama_ip" default="128.131.86.193" />
+    <arg name="llm_model" default="llama3.1" />
+
+    <!-- Set the parameter using the argument value -->
+    <param name="language" value="$(arg language)" />
+    <param name="language" value="$(arg language)" />
+    <param name="llm_model" value="$(arg llm_model)" />
+    
+    <!-- Launch a node with arguments -->
+    <node pkg="whisper_ros" type="ollama_chat.py" name="ollama_chat" output="screen">
+        <param name="language" value="$(arg language)" />
+        <param name="ollama_ip" value="$(arg ollama_ip)" />
+        <param name="llm_model" value="$(arg llm_model)" />
+    </node>
+</launch>

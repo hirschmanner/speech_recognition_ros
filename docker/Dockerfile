@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.1.1-base-ubuntu20.04 AS whisper_ros
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && apt-get install -y \
-	python3-opencv ca-certificates python3-dev git wget sudo ninja-build vim
+	python3-opencv ca-certificates python3-dev python3-tk git wget sudo ninja-build vim
 RUN ln -sv /usr/bin/python3 /usr/bin/python
 
 RUN wget https://bootstrap.pypa.io/get-pip.py && \
@@ -69,6 +69,7 @@ RUN source ~/.bashrc
 
 # install requirements
 COPY docker/requirements.txt .
+RUN pip install importlib_metadata --upgrade
 RUN pip install -r requirements.txt --ignore-installed PyYAML
 
 

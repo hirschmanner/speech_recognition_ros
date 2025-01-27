@@ -22,9 +22,8 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - NVIDIA_VISIBLE_DEVICES=all
       - PULSE_SERVER=unix:${XDG_RUNTIME_DIR}/pulse/native
-      - ROS_MASTER_URI=http://hsrb.local:11311
-      - ROS_IP=hsrb.local
-      - ROS_HOSTNAME=rupaul
+      - ROS_MASTER_URI=http://10.0.0.143:11311
+      - ROS_IP=10.0.0.238
     devices:
       - "/dev/snd"
     cap_add:

@@ -1,3 +1,11 @@
+#importlib_metadata>8
+setuptools
 webrtcvad
 pyalsaaudio
+packaging>=24
+ordered-set>=3.1.1
+more_itertools>=8.8
+importlib_resources>=5.10.2
+torch==2.1.2
+torchaudio==2.1.2
 git+https://github.com/m-bain/whisperx.git

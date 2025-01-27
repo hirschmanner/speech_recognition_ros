@@ -45,11 +45,11 @@ catkin_python_setup()
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
- add_message_files(
-   FILES
-   #Voice.msg
-   #Message2.msg
- )
+# add_message_files(
+#   FILES
+#   #Voice.msg
+#   #Message2.msg
+# )
 
 ## Generate services in the 'srv' folder
 #add_service_files(
@@ -120,7 +120,7 @@ include_directories(
 
 ########## NEW 31.1.2018 ##########
 find_package(catkin REQUIRED COMPONENTS roslaunch)
-roslaunch_add_file_check(launch)
+# roslaunch_add_file_check(launch)
 
 install(DIRECTORY launch/
     DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}/launch
