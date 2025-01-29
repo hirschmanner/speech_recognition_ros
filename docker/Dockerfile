@@ -1,9 +1,13 @@
-FROM nvidia/cuda:12.1.1-base-ubuntu20.04 AS whisper_ros
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04 AS whisper_ros_cudnn
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get update && apt-get install -y \
-	python3-opencv ca-certificates python3-dev python3-tk git wget sudo ninja-build vim
+
+RUN apt-get update && apt-get install -y software-properties-common
+	#python3-opencv 
+RUN add-apt-repository ppa:deadsnakes/ppa 
+RUN apt-get install -y python3.8
+RUN apt-get install -y ca-certificates python3-dev python3-tk git wget sudo ninja-build vim
 RUN ln -sv /usr/bin/python3 /usr/bin/python
 
 RUN wget https://bootstrap.pypa.io/get-pip.py && \
@@ -28,9 +32,10 @@ RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sud
 # install ros
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    ros-noetic-desktop-full \
+    #ros-noetic-desktop-full \
+    ros-noetic-ros-base \
     ros-noetic-catkin \
-    ros-noetic-vision-msgs \
+    #ros-noetic-vision-msgs \
     ros-noetic-audio-common \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
