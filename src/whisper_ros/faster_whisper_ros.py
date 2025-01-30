@@ -262,7 +262,7 @@ class SpeechPublisher:
             print(f"Paused speech recognition.")
             return SetBoolResponse(success = True, message = f"Paused speech recognition.")
         else:
-            print(f"Paused speech recognition.")
+            print(f"Unpaused speech recognition.")
             return SetBoolResponse(success = True, message = f"Unpaused speech recognition.")
 
     def run(self):
