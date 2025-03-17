@@ -18,7 +18,13 @@ docker compose run --name speechrecognition-ros whisper-ros
 ```
 In the docker container you can start the speech recognition with:
 ```
-roslaunch whisper-ros speechrecognition_ros.launch
+catkin build && source devel/setup.bash
+roslaunch whisper_ros speechrecognition_ros.launch
+```
+For the different available parameters, check the file `speechrecognition_ros.launch`. The speechrecognition node expects an audio topic with the message type `audio_common_msgs/AudioData`. An audio capturing node that uses the standard microphone can be started with :
+```
+docker exec -it speechrecognition-ros bash
+roslaunch audio_capture capture_wave.launch
 ```
 
 ### Run Natively
@@ -31,7 +37,8 @@ pip install -r requirements.txt
 ```
 4. Build your catkin workspace and launch the speech recognition with 
 ```
-roslaunch whisper-ros speechrecognition_ros.launch
+catkin build && source devel/setup.bash
+roslaunch whisper_ros speechrecognition_ros.launch
 ```
 
 ## Contact

@@ -1,9 +1,9 @@
 services:
-  whisper_ros_cudnn:
+  whisper-ros:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-      target: whisper_ros_cudnn
+      target: whisper-ros
     network_mode: "host"
     runtime: "nvidia"
     volumes:
@@ -25,6 +25,8 @@ services:
       #- ROS_IP=10.0.0.238
     devices:
       - "/dev/snd"
+        #- /dev/ttyACM0:/dev/ttyUSB0
+      - /dev:/dev
     cap_add:
       - SYS_RAWIO
     security_opt:

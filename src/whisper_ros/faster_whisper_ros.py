@@ -73,10 +73,12 @@ class SpeechPublisher:
         data to Whisper and publish the Phrase as a ROS message. 
     """
     def __init__(self,
+                 audio_topic = "/audio/audio",
                  framerate=16000, 
                  whisper_model = 'large-v3-turbo',
                  languageString = 'en',
-                 ring_buffer_size = 1000, 
+                 ring_buffer_size = 1000,
+                 max_silence_length = 1000,
                  vad = "silero", 
                  speech_threshold=0.7): 
         
@@ -84,15 +86,18 @@ class SpeechPublisher:
         if self.write_wav_files:
             self.file_counter = 0
         
+        self.vad_total_size = ring_buffer_size
+
         # The main buffer that will be fed into the speech recognition model
         self.buffer = Buffer(b'', 0, 0)
         self.framerate = framerate
         self.languageString = languageString
         self.vad_type = vad
         self.speech_threshold = speech_threshold
-        
+        self.audio_topic = audio_topic
+
         if self.vad_type == 'webrtc':
-            self.vad_webrtc = webrtcvad.Vad(mode=2) # The aggressiveness handles how aggressive the VAD is to remove non-speech. Between 0 and 3
+            self.vad_webrtc = webrtcvad.Vad(mode=1) # The aggressiveness handles how aggressive the VAD is to remove non-speech. Between 0 and 3
             if framerate in [8000, 16000, 32000, 48000]:
                 self.vad_chunk_size = framerate * 0.01 * 2 # 10 ms for 16 bit uint
             else:
@@ -122,11 +127,15 @@ class SpeechPublisher:
 
         #self.listenMsg = bool_msg()
         #self.vad_chunk_size = 320
-        msg = rospy.wait_for_message("audio/audio", AudioData)
+        print(f"Waiting for Audio to be published on {self.audio_topic}")
+        msg = rospy.wait_for_message(self.audio_topic, AudioData)
         self.audio_message_length_bits = len(msg.data)
         self.audio_message_length_time = len(msg.data)/(2*self.framerate)
 
+        self.trigger_buffer_size = int(np.ceil(ring_buffer_size / (self.audio_message_length_time*1000)))
+        ring_buffer_size = np.max((ring_buffer_size, max_silence_length))
         self.data_buffer_size = int(np.ceil(ring_buffer_size / (self.audio_message_length_time*1000)))
+        
 
         if self.vad_chunk_size <= self.audio_message_length_bits:
             self.is_speech_buffer_size = int(self.data_buffer_size * (self.audio_message_length_bits // self.vad_chunk_size))
@@ -147,7 +156,7 @@ class SpeechPublisher:
         self.counter = 0
         # Create a publisher that publishes strings to the 'string_topic'
         self.recognized_phrase_publisher = rospy.Publisher('/recognized_phrase', String, queue_size=10)
-        self.subscriber = rospy.Subscriber('/audio/audio', AudioData, self.audio_callback, queue_size=10)
+        self.subscriber = rospy.Subscriber(self.audio_topic, AudioData, self.audio_callback, queue_size=10)
 
     
     def audio_callback(self, msg):
@@ -173,7 +182,7 @@ class SpeechPublisher:
                 self.buffer.clearBuffer()
             return
         data = msg.data
-
+        #print("blub")
         # We collect enough chunks in the vad_buffer until they are ready to be analyzed by VAD.
         self.vad_buffer+=data
         if len(self.vad_buffer)>=self.vad_chunk_size:
@@ -190,7 +199,8 @@ class SpeechPublisher:
                 if self.vad_type == 'silero':
                     audio_float32 = np.frombuffer(self.vad_buffer[i:i + self.vad_chunk_size], dtype=np.int16).flatten().astype(np.float32) / 32768.0
                     new_confidence = self.vad_silero(torch.from_numpy(audio_float32), 16000).item()
-                    self.ring_buffer_is_speech.append(new_confidence>0.5)
+                    self.ring_buffer_is_speech.append(new_confidence>0.01)
+                    #print(new_confidence)
                 elif self.vad_type == 'webrtc':
                     is_speech = self.vad_webrtc.is_speech(self.vad_buffer[i:i + self.vad_chunk_size], self.framerate)
                     self.ring_buffer_is_speech.append(is_speech)
@@ -202,8 +212,8 @@ class SpeechPublisher:
 
             # If we're NOTTRIGGERED and more than 'speech_threshold' of the frames in
             # the ring buffer are voiced frames, then enter the TRIGGERED state.
-            if len(self.ring_buffer_is_speech) == self.is_speech_buffer_size:
-                if np.mean(self.ring_buffer_is_speech) > self.speech_threshold:
+            if len(self.ring_buffer_is_speech) >= self.trigger_buffer_size:
+                if np.mean(list(self.ring_buffer_is_speech)[-self.trigger_buffer_size:]) > self.speech_threshold:
                     # Set startTime to currentTime - ringBufferSize*0.01s. Each of our samples is 10ms
                     self.buffer.startTime.data = rospy.get_rostime() - rospy.Time.from_sec(self.data_buffer_size*self.audio_message_length_time/self.framerate)
                     self.triggered = True
@@ -224,7 +234,7 @@ class SpeechPublisher:
             # unvoiced, then enter NOTTRIGGERED and yield whatever
             # audio we've collected.
             if len(self.ring_buffer_is_speech) == self.is_speech_buffer_size:
-                if np.mean(self.ring_buffer_is_speech) < 0.7:
+                if np.mean(self.ring_buffer_is_speech) < self.speech_threshold and np.mean(list(self.ring_buffer_is_speech)[-self.trigger_buffer_size:]) < self.speech_threshold:
                     self.buffer.endTime.data = rospy.get_rostime()
                     self.triggered = False
                     print("Untriggered")
@@ -300,6 +310,8 @@ def write_wave(path, audio, sample_rate):
 def main(args):
     rospy.init_node('speech_recognition', anonymous=True)
 
+    audio_topic = rospy.get_param('~audio_topic', '/audio/audio')
+
     language = rospy.get_param('~language', 'english')
     if not language in language_dict:
         rospy.logerr(f"Invalid language '{language}'! Must be one of {list(language_dict.keys())}")
@@ -310,7 +322,7 @@ def main(args):
         rospy.logerr(f"Invalid whisper_model '{whisper_model}'! Must be one of {available_models()}")
         raise ValueError(f"Invalid whisper_model '{whisper_model}'. Allowed values are: {available_models()}")
     
-    vad = rospy.get_param('~vad', 'silero')
+    vad = rospy.get_param('~vad', 'webrtc')
     if not vad in ["silero", "webrtc"]:
         rospy.logerr(f"Invalid VAD '{vad}'! Must be one of {['silero', 'webrtc']}")
         raise ValueError(f"Invalid VAD '{vad}'. Allowed values are: {['silero', 'webrtc']}")
@@ -319,6 +331,11 @@ def main(args):
     if not buffer_size > 0:
         rospy.logerr(f"Invalid buffer_size '{buffer_size}'! Must be positive integer.")
         raise ValueError(f"Invalid buffer_size '{buffer_size}'. Must be positive integer.")
+    
+    max_silence_length = int(rospy.get_param('~max_silence_length', '3000'))
+    if not max_silence_length > 0:
+        rospy.logerr(f"Invalid max_silence_length '{max_silence_length}'! Must be positive integer.")
+        raise ValueError(f"Invalid max_silence_length '{max_silence_length}'. Must be positive integer.")
     
     speech_threshold = float(rospy.get_param('~speech_threshold', '0.5'))
     if not speech_threshold >= 0. or not speech_threshold <= 1.0:
@@ -332,10 +349,12 @@ def main(args):
 
     rospy.loginfo(f"Chosen Language: {language}")
   
-    speechRecognition = SpeechPublisher(framerate=framerate, 
+    speechRecognition = SpeechPublisher(audio_topic = audio_topic,
+                                        framerate=framerate, 
                                         whisper_model=whisper_model,
                                         languageString=language_dict[language],
                                         ring_buffer_size=buffer_size,
+                                        max_silence_length=max_silence_length,
                                         vad=vad,
                                         speech_threshold=speech_threshold)
     rospy.sleep(2.)

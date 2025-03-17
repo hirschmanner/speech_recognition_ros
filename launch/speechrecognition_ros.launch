@@ -12,19 +12,27 @@
     <!-- Buffer before speech is detected in ms. This value is rounded up to the next multiple of chunksize. -->
     <arg name="buffer_size" default="1000" />
 
+    <!-- The length of silence while we are in the TRIGGERED state until we go to the untriggered state in ms. -->
+    <arg name="max_silence_length" default="3000" />
+
     <!-- How much of the buffer is detected as speech before recognition starts. Higher values mean that it will be less sensitive. (0.0-1.0) -->
     <arg name="speech_threshold" default="0.7" />
 
     <!-- Framerate of Audio Stream. Only tested with 16000. Silero VAD only supports 8000 and 16000. WebRTC supports 8000, 16000, 32000, 48000.-->
     <arg name="framerate" default="16000" />
 
+    <!-- The name of the audio topic-->
+    <arg name="audio_topic" default="/audio/audio" />
+
     <!-- Set the parameter using the argument value -->
     <param name="whisper_model" value="$(arg whisper_model)" type="str"/>
     <param name="language" value="$(arg language)" type="str"/>
     <param name="vad" value="$(arg vad)" type="str"/>
     <param name="buffer_size" value="$(arg buffer_size)" type="int"/>
+    <param name="max_silence_length" value="$(arg max_silence_length)" type="int"/>
     <param name="speech_threshold" value="$(arg speech_threshold)" type="double"/>
     <param name="framerate" value="$(arg framerate)" type="int"/>
+    <param name="audio_topic" value="$(arg audio_topic)" type="str"/>
 
 
     
@@ -34,7 +42,9 @@
         <param name="language" value="$(arg language)" />
         <param name="vad" value="$(arg vad)" />
         <param name="buffer_size" value="$(arg buffer_size)" />
+        <param name="max_silence_length" value="$(arg max_silence_length)" />
         <param name="speech_threshold" value="$(arg speech_threshold)" />
         <param name="framerate" value="$(arg framerate)" />
+        <param name="audio_topic" value="$(arg audio_topic)" />
     </node>
 </launch>

@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04 AS whisper_ros_cudnn
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04 AS whisper-ros
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -79,4 +79,4 @@ RUN pip install -r requirements.txt --ignore-installed PyYAML
 
 
 
-WORKDIR /root
+WORKDIR /catkin_ws
